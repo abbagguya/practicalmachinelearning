@@ -1,0 +1,176 @@
+---
+title: 'HAR Using Weight Lifting Exercise Data: Excercise Form Prediction'
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+#### James Kim
+#### March 8, 2017
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Executive Summary
+
+Human activity research (HAR) is presented in which a weight lifting exercise data set is used to identify exercise form.  Using devices such as Jawbone Up, Nike FuelBand, and Fitbit, it is now possible to collect large amounts of data on personal activity relatively inexpensively. While quantifying how much of a particular activity is performed has frequently been investigated, quantifying how well it is done is just beginning to gain attention. The goal of this investigaiton is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants who were asked to perform barbell lift exercise correctly and incorrectly in 5 different ways. The data set comes from the Weight Lifting Exercise Dataset of the publication: Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises.
+
+Random forest predictive modeling is used for training and prediction. Selection of features for the predictive modeling and the results of the modeling are presented and discussed. Using 12 features selected out of approximately 60 raw feature data, 99% accuracy (1.4% OOB error rate) is achieved. Finally, a prediction for a test set of 20 observations is presented.
+
+### Exploratory Data Analysis & Feature Selection
+
+Data sets in csv form are loaded, consisting of a train data set and a test data set.
+
+Because the number of variables and the number of observations are both very large, a substantial reduction in the number of potential features using intuition about the measurements proves effective over exploring every variable. The effecriveness of the selected feature variables can be coonfirmed by the outcome of the predictive modeling.
+
+The following describes the basis for the initial intuition-based feature selection.
+
+A. sensor selection:
+
+1. belt sensor most likely would move mostly in the z direction
+2. arm sensor would not have much movement except in the case of class B
+3. forearm sensor most likely would move mostly in the y and z directions
+4. dumbbell sensor would most likely have movement similar to the forearm
+
+B. yaw, pitch, and roll summarize raw gyro data (i.e. related, so gyro data are not used)
+
+C. magnet data are not used
+
+D. whereas in the journal publications the authors who gathered the data show using statistical parameters derived from the raw data, raw data are directly used in the modeling
+
+From this starting point, feature selection is optimized by examining importance of variables, further adding and removing variables and minimizing prediction error. Shown below are density plots for the selected 12 feature variables distinguished by color according to the classe variable containing the classification result. The density plots are preferable over box plots for feature discovery due to revealing more information regarding distribution. The feature variables are expected to vary extensively according to the classification for high predictive power, and the density plots show that the selected features do appear to be quite variable with respect to the classification.
+
+```{r load & setup,cache=TRUE,echo=FALSE,message=FALSE}
+# load data (csv formatted)
+train<-read.csv("pml-training.csv",header=TRUE)
+test<-read.csv("pml-testing.csv",header=TRUE)
+```
+
+```{r exploration,cache=FALSE,echo=FALSE,message=FALSE}
+# feature selection:
+# because the number of variables is very large, it would be beneficial
+# to reduce the number of potential features using intuition about the
+# measurement itself, rather than explore every variable.
+#
+# the following constitute the basis for the intuition-based selection:
+# A. sensor selection
+#    1. belt would most likely move mostly in the z direction
+#    2. arm would not have much movement except in the case of class B
+#    3. forearm would likely have movement in y and z directions
+#    4. dumbbell most likely have movement similar to the forearm
+# B. yaw, pitch, and roll are assumed to summarize gyro movements
+# C. magnet variables are ignored
+# D. whereas the journal publications by the authors who gathered data show
+#    using statistical parameters derived from the raw data, raw data are
+#    directly used in the fitting
+
+require(ggplot2);require(gridExtra)
+
+feature.list<-c("pitch_belt","roll_belt","yaw_belt","total_accel_belt","accel_belt_z",
+                "total_accel_arm","accel_arm_z",
+                "pitch_forearm","accel_forearm_y","accel_forearm_z",
+                "accel_dumbbell_y","accel_dumbbell_z",
+                "classe")
+feature.cols<-which(names(train)%in%feature.list)
+
+# plot the selected variables and examine them to see that
+# the intuition-based selection is OK
+grid.arrange(ggplot(train,aes(col=classe))+geom_density(aes(train[,feature.cols[1]]))+xlab(feature.list[1]),
+             ggplot(train,aes(col=classe))+geom_density(aes(train[,feature.cols[2]]))+xlab(feature.list[2]),
+             ggplot(train,aes(col=classe))+geom_density(aes(train[,feature.cols[3]]))+xlab(feature.list[3]),
+             ggplot(train,aes(col=classe))+geom_density(aes(train[,feature.cols[4]]))+xlab(feature.list[4]),
+             ggplot(train,aes(col=classe))+geom_density(aes(train[,feature.cols[5]]))+xlab(feature.list[5]),
+             ggplot(train,aes(col=classe))+geom_density(aes(train[,feature.cols[6]]))+xlab(feature.list[6]),
+             ggplot(train,aes(col=classe))+geom_density(aes(train[,feature.cols[7]]))+xlab(feature.list[7]),
+             ggplot(train,aes(col=classe))+geom_density(aes(train[,feature.cols[8]]))+xlab(feature.list[8]),
+             ggplot(train,aes(col=classe))+geom_density(aes(train[,feature.cols[9]]))+xlab(feature.list[9]),
+             ggplot(train,aes(col=classe))+geom_density(aes(train[,feature.cols[10]]))+xlab(feature.list[10]),
+             ggplot(train,aes(col=classe))+geom_density(aes(train[,feature.cols[11]]))+xlab(feature.list[11]),
+             ggplot(train,aes(col=classe))+geom_density(aes(train[,feature.cols[12]]))+xlab(feature.list[12]))
+```
+
+### Modeling
+
+Exploratory random forest modeling is performed with the 12 feature variables, and the code for accomplishing this is shown below (note the code shows only the modeling portion).
+
+```{r preparation for modeling,cache=FALSE,echo=FALSE,message=FALSE}
+###############################################################################
+# modeling using the random forests method using parallel (core) processing
+# 1. use single-iteration modeling to evaluate feature selection
+# 2. use cross-validated modeling to improve modeling prediction
+
+# gather relevant features columns and the classifcation column
+training<-train[,feature.list]
+```
+
+```{r exploratory random forest modeling I,cache=FALSE,echo=FALSE,message=FALSE}
+###############################################################################
+# 1. rf modeling
+# training set (feature selection) partitioned into 7:3 subsets
+# for exploratory random forest modeling
+
+require(caret);require(randomForest)
+set.seed(01010)
+training.partition<-createDataPartition(training$classe,p=0.7,list=FALSE)
+```
+
+```{r exploratory random forest modeling II,cache=FALSE,echo=TRUE,message=FALSE}
+# parallel (75% of the cores) processing {
+require(parallel);require(doSNOW)
+cluster<-makeCluster(floor(detectCores()*0.75),type='SOCK');registerDoSNOW(cluster)
+rf.model.fit<-randomForest(classe~.,training[training.partition,],importance=TRUE)
+stopCluster(cluster);registerDoSEQ()
+# }
+```
+
+The result of the modeling performed with randomly selected 70% of the data set is presented below. In the result, OOB error rate is 1.4% for the modeling, and this low OOB error rate shows that the feature selection is effective. Also ranked importance of the features is shown in a variable importance plot in which the yaw_belt and pitch_belt features are shown to of surprisingly high importance (i.e. the accuracy decreases the most without it). This is a surpring result since abdomen movement during a barbel exercise is thought to be minimal. However, it may indicate that these offer the most distinguishable variability and thus are important variables.
+
+```{r exploratory random forest modeling III,cache=FALSE,echo=FALSE,message=FALSE}
+rf.model.fit
+varImpPlot(rf.model.fit,type=1)
+```
+
+The model fit is used to predict classification for the testing set consisting of the remaining 30% of the data, and a confusion matrix is shown for the classification prediction and the actual classification. As shown, the overall prediction accuracy is high at 99%.
+
+```{r exploratory random forest modeling IV,cache=FALSE,echo=FALSE,message=FALSE}
+
+# prediction vs. testing subset
+confusionMatrix(predict(rf.model.fit,training[-training.partition,]),
+                training[-training.partition,]$classe)
+```
+
+Cross validation modeling is then performed to reduce overfitting and improve prediction accuracy when predicting unseen test data sets. Code for accomplishing this is shown (note the code shows only the modeling portion), followed by the result of the modeling. The result of the 10-fold cross validation random forest modeling shows accuracy of 99%, little changed from the exploratory modeling result.  It is expected, however, that overfitting is substantially reduced such that a prediciton made on an unseen data set is improved.
+
+```{r cross-validated random forest modeling I,cache=FALSE,echo=FALSE,message=FALSE}
+###############################################################################
+# 2. cross-validated random forest modeling
+# training set used for 10-fold cross-validated random forest modeling
+
+require(caret)
+set.seed(01010)
+train.control<-trainControl(method='cv',number=10)
+```
+
+```{r cross-validated random forest modeling II,cache=TRUE,echo=TRUE,message=FALSE}
+# parallel (75% of the cores) processing {
+require(parallel);require(doSNOW)
+cluster<-makeCluster(floor(detectCores()*0.75),type='SOCK');registerDoSNOW(cluster)
+cv.rf.model.fit<-train(classe~.,data=training,method='rf',trControl=train.control)
+stopCluster(cluster);registerDoSEQ()
+# }
+```
+
+```{r cross-validated random forest modeling III,cache=FALSE,echo=FALSE,message=FALSE}
+# modeling result
+cv.rf.model.fit
+```
+
+### Results
+
+The cross validation random forest modeling is used to predict classfication of a test data set consisting of 20 observables, and the prediction result is shown below.  The prediction result is confirmed (via the project quiz) to be 100% accurate, in line with the above results showing high predictive accuracy of the modeling.
+
+```{r results,cache=FALSE,echo=FALSE,message=FALSE}
+###############################################################################
+# cross-validated random forest modeling prediction
+data.frame(problem_id=test$problem_id,prediction=predict(cv.rf.model.fit,test))
+```
