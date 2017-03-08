@@ -1,8 +1,8 @@
 ---
 title: 'HAR Using Weight Lifting Exercise Data: Excercise Form Prediction'
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
   word_document: default
 ---
 #### James Kim
@@ -11,6 +11,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
 ### Executive Summary
 
 Human activity research (HAR) is presented in which a weight lifting exercise data set is used to identify exercise form.  Using devices such as Jawbone Up, Nike FuelBand, and Fitbit, it is now possible to collect large amounts of data on personal activity relatively inexpensively. While quantifying how much of a particular activity is performed has frequently been investigated, quantifying how well it is done is just beginning to gain attention. The goal of this investigaiton is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants who were asked to perform barbell lift exercise correctly and incorrectly in 5 different ways. The data set comes from the Weight Lifting Exercise Dataset of the publication: Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises.
