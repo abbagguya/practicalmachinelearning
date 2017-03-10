@@ -22,7 +22,7 @@ Random forest predictive modeling is used for training and prediction. Selection
 
 Data sets in csv form are loaded, consisting of a train data set and a test data set.
 
-Because the number of variables and the number of observations are both very large, a substantial reduction in the number of potential features using intuition about the measurements proves effective over exploring every variable. The effecriveness of the selected feature variables can be coonfirmed by the outcome of the predictive modeling.
+Because the number of variables and the number of observations are both very large, a substantial reduction in the number of potential features using intuition about the measurements proves effective over exploring every variable. The effectiveness of the selected feature variables can be confirmed by the outcome of the predictive modeling.
 
 The following describes the basis for the initial intuition-based feature selection.
 
@@ -39,7 +39,7 @@ C. magnet data are not used
 
 D. whereas in the journal publications the authors who gathered the data show using statistical parameters derived from the raw data, raw data are directly used in the modeling
 
-From this starting point, feature selection is optimized by examining importance of variables, further adding and removing variables and minimizing prediction error. Shown below are density plots for the selected 12 feature variables distinguished by color according to the classe variable containing the classification result. The density plots are preferable over box plots for feature discovery due to revealing more information regarding distribution. The feature variables are expected to vary extensively according to the classification for high predictive power, and the density plots show that the selected features do appear to be quite variable with respect to the classification.
+From this starting point, feature selection is optimized by examining importance of variables, further adding and removing variables and minimizing prediction error. Shown below are density plots for the selected 12 feature variables distinguished by color according to the classe variable containing the classification result. The density plots are preferable over box plots for feature discovery due to revealing more information regarding distribution. These feature variables are expected to vary extensively according to the classification for high predictive power, and the density plots show that the selected features do appear to be quite variable with respect to the classification.
 
 ```{r load & setup,cache=TRUE,echo=FALSE,message=FALSE}
 # load data (csv formatted)
@@ -104,27 +104,18 @@ Exploratory random forest modeling is performed with the 12 feature variables, a
 training<-train[,feature.list]
 ```
 
-```{r exploratory random forest modeling I,cache=FALSE,echo=FALSE,message=FALSE}
-###############################################################################
-# 1. rf modeling
-# training set (feature selection) partitioned into 7:3 subsets
-# for exploratory random forest modeling
-
-require(caret);require(randomForest)
-set.seed(01010)
-training.partition<-createDataPartition(training$classe,p=0.7,list=FALSE)
-```
-
 ```{r exploratory random forest modeling II,cache=FALSE,echo=TRUE,message=FALSE}
-# parallel (75% of the cores) processing {
+require(caret);require(randomForest);set.seed(01010)
+training.partition<-createDataPartition(training$classe,p=0.7,list=FALSE)
+# parallel (75% of the cores) processing enclosure
 require(parallel);require(doSNOW)
 cluster<-makeCluster(floor(detectCores()*0.75),type='SOCK');registerDoSNOW(cluster)
 rf.model.fit<-randomForest(classe~.,training[training.partition,],importance=TRUE)
 stopCluster(cluster);registerDoSEQ()
-# }
+# enclosure end
 ```
 
-The result of the modeling performed with randomly selected 70% of the data set is presented below. In the result, OOB error rate is 1.4% for the modeling, and this low OOB error rate shows that the feature selection is effective. Also ranked importance of the features is shown in a variable importance plot in which the yaw_belt and pitch_belt features are shown to of surprisingly high importance (i.e. the accuracy decreases the most without it). This is a surpring result since abdomen movement during a barbel exercise is thought to be minimal. However, it may indicate that these offer the most distinguishable variability and thus are important variables.
+The result of the modeling performed with randomly selected 70% of the data set is presented below. In the result, OOB error rate is 1.4% for the modeling, and this low OOB error rate shows that the feature selection is effective. Also ranked importance of the features is shown in a variable importance plot. In the plot, yaw_belt and pitch_belt features are shown to be of surprisingly high importance (i.e. the accuracy decreases the most without them). This is a surprising result since abdomen movement during a barbell exercise would be thought to be minimal. However, the high ranking may indicate that these variables offer the most distinguishable variability and thus are important.
 
 ```{r exploratory random forest modeling III,cache=FALSE,echo=FALSE,message=FALSE}
 rf.model.fit
@@ -140,25 +131,18 @@ confusionMatrix(predict(rf.model.fit,training[-training.partition,]),
                 training[-training.partition,]$classe)
 ```
 
-Cross validation modeling is then performed to reduce overfitting and improve prediction accuracy when predicting unseen test data sets. Code for accomplishing this is shown (note the code shows only the modeling portion), followed by the result of the modeling. The result of the 10-fold cross validation random forest modeling shows accuracy of 99%, little changed from the exploratory modeling result.  It is expected, however, that overfitting is substantially reduced such that a prediciton made on an unseen data set is improved.
+Cross validation modeling is then performed to reduce overfitting and improve accuracy when predicting unseen test data sets. The code for accomplishing this is shown (note the code shows only the modeling portion), followed by the result of the modeling. The result of the 10-fold cross validation random forest modeling shows accuracy of 99%, little changed from the exploratory modeling result. It is expected, however, that overfitting is substantially reduced such that a prediciton made on an unseen data set is improved.
 
-```{r cross-validated random forest modeling I,cache=FALSE,echo=FALSE,message=FALSE}
-###############################################################################
-# 2. cross-validated random forest modeling
-# training set used for 10-fold cross-validated random forest modeling
-
+```{r cross-validated random forest modeling II,cache=TRUE,echo=TRUE,message=FALSE}
 require(caret)
 set.seed(01010)
 train.control<-trainControl(method='cv',number=10)
-```
-
-```{r cross-validated random forest modeling II,cache=TRUE,echo=TRUE,message=FALSE}
-# parallel (75% of the cores) processing {
+# parallel (75% of the cores) processing enclosure
 require(parallel);require(doSNOW)
 cluster<-makeCluster(floor(detectCores()*0.75),type='SOCK');registerDoSNOW(cluster)
 cv.rf.model.fit<-train(classe~.,data=training,method='rf',trControl=train.control)
 stopCluster(cluster);registerDoSEQ()
-# }
+# enclosure end
 ```
 
 ```{r cross-validated random forest modeling III,cache=FALSE,echo=FALSE,message=FALSE}
@@ -168,7 +152,7 @@ cv.rf.model.fit
 
 ### Results
 
-The cross validation random forest modeling is used to predict classfication of a test data set consisting of 20 observables, and the prediction result is shown below.  The prediction result is confirmed (via the project quiz) to be 100% accurate, in line with the above results showing high predictive accuracy of the modeling.
+The cross validation random forest modeling is used to predict classfication of a test data set consisting of 20 observables, and the prediction result is shown below. The prediction result is confirmed (via the project quiz) to be 100% accurate, in line with the above results showing high predictive accuracy of the modeling.
 
 ```{r results,cache=FALSE,echo=FALSE,message=FALSE}
 ###############################################################################
